@@ -323,8 +323,6 @@ running = False
 
 def run():
     global running
-    global return_plate_imgs
-    global return_plate_infos
     global img_result
     img_result = np.zeros((620, 480, 3), dtype=np.uint8)
     global return_result_chars
@@ -360,37 +358,9 @@ def run():
         #카메라에서 입력되는 이미지 데이터에서 번호판 부분을 인식하여 리턴되는 이미지 데이터를 저장합니다.
         return_ret, return_frame = get_plate_img()
         if return_ret:
-            #이미지 데이터를 PyQt GUI에 출력하기 위해 변환하는 과정을 진행합니다.
-            img = cv2.cvtColor(return_frame, cv2.COLOR_BGR2RGB)
-            h, w, c = img.shape
-            qImg = QtGui.QImage(img.data, w, h, w*c,
-                                QtGui.QImage.Format_RGB888)
-            pixmap = QtGui.QPixmap.fromImage(qImg)
-            label.setPixmap(pixmap)
-
-            #쓰레드로 실행되고 있는 img_to_chars함수에서 번호판 이미지를 텍스트로 변환하는 과정이 처리되어
-            #전역 변수인 return_result_chars에 저장된 데이터에 따라 결과 라벨과 서보모터를 제어하는 부분입니다.
-            if return_result_chars:
-                for plate in plate_data:
-                    if plate_data[plate][0] == return_result_chars:
-                        if plate_data[plate][1] == 1:
-                            label2.setText(return_result_chars)
-                            label3.setText("번호판이 확인되었습니다.")
-                            servo0.angle = 150
-                            break
-                        else:
-                            label2.setText(return_result_chars)
-                            label3.setText("허가되지 않은 번호판입니다.")
-                            break
-                    else :
-                        label2.setText(return_result_chars)
-                        label3.setText("등록되지 않은 번호판입니다.")
-            else:
-                label2.setText("--------")
-                label2.setFont(QtGui.QFont("Sans", 30))
-                label3.setText("번호판이 인식되지 않았습니다.")
-                label3.setFont(QtGui.QFont("Sans", 30))
-                servo0.angle = 10
+            #cv의 프레임 데이터를 qt에 출력하기 위해 변환합니다.
+            label.setPixmap(convert_cv_qt(return_frame))
+            control_servo(return_result_chars)
 
         else:
             QtWidgets.QMessageBox.about(win, "Error", "Cannot read frame.")
@@ -399,6 +369,40 @@ def run():
         # print("main_running")
     cap.release()
     print("Thread end.")
+
+def control_servo(detected_chars):
+    #쓰레드로 실행되고 있는 img_to_chars함수에서 번호판 이미지를 텍스트로 변환하는 과정이 처리되어
+    #전역 변수인 return_result_chars에 저장된 데이터에 따라 결과 라벨과 서보모터를 제어하는 부분입니다.
+    if detected_chars:
+        for plate in plate_data:
+            if plate_data[plate][0] == detected_chars:
+                if plate_data[plate][1] == 1:
+                    label2.setText(detected_chars)
+                    label3.setText("번호판이 확인되었습니다.")
+                    servo0.angle = 150
+                    break
+                else:
+                    label2.setText(detected_chars)
+                    label3.setText("허가되지 않은 번호판입니다.")
+                    break
+            else :
+                label2.setText(detected_chars)
+                label3.setText("등록되지 않은 번호판입니다.")
+    else:
+        label2.setText("--------")
+        label2.setFont(QtGui.QFont("Sans", 30))
+        label3.setText("번호판이 인식되지 않았습니다.")
+        label3.setFont(QtGui.QFont("Sans", 30))
+        servo0.angle = 10
+
+
+def convert_cv_qt(cv_img):
+    #이미지 데이터를 PyQt GUI에 출력하기 위해 변환하는 과정을 진행합니다.
+    img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+    h, w, c = img.shape
+    qImg = QtGui.QImage(img.data, w, h, w*c, QtGui.QImage.Format_RGB888)
+    return QtGui.QPixmap.fromImage(qImg)
+
 
 #번호판의 상테와 버튼 색상을 바꿔주는 함수입니다.
 def reverse_status(x):
@@ -438,6 +442,7 @@ if __name__ == "__main__":
     plate_buttons = [QtWidgets.QPushButton("버튼1"), QtWidgets.QPushButton("버튼2"),
                     QtWidgets.QPushButton("버튼3"), QtWidgets.QPushButton("버튼4"),
                     QtWidgets.QPushButton("버튼5"), QtWidgets.QPushButton("버튼6")]
+    
     for plate_button in plate_buttons:
         plate_idx = plate_buttons.index(plate_button)
         plate_buttons[plate_idx].setFont(QtGui.QFont("Sans", 18))
@@ -471,6 +476,3 @@ if __name__ == "__main__":
     sys.exit(app.exec_())
     app.quit()
     pca.deinit()
-
-
-
